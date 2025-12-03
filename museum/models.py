@@ -24,7 +24,7 @@ class Artifact(models.Model):
 class Hall(models.Model):
     name = models.TextField("Название")
     group = models.ForeignKey("Group", on_delete=models.CASCADE, null=True)
-
+    picture = models.ImageField(upload_to='halls/', null=True, blank=True)
     class Meta:
         verbose_name = "Зал"
         verbose_name_plural = "Залы"

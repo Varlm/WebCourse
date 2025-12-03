@@ -31,7 +31,7 @@ class HallSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hall
-        fields = ['id', 'name', 'group', 'group_id']
+        fields = ['id', 'name', 'group', 'group_id', 'picture']
 
 
 class CuratorSerializer(serializers.ModelSerializer):

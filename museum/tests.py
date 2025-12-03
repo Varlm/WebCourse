@@ -5,7 +5,7 @@ from django.test import TestCase
 from model_bakery import baker
 from museum.models import Artifact, Group, Hall, Curator, Exhibition
 from django.contrib.auth.models import User
-# ---------------- Artifact ----------------
+
 @pytest.mark.django_db
 class ArtifactAPITestCase(TestCase):
     def setUp(self):
@@ -126,7 +126,6 @@ class HallAPITestCase(TestCase):
         assert hall.name == "Обновленный зал"
         assert hall.group == new_group
 
-# ---------------- Curator ----------------
 @pytest.mark.django_db
 class CuratorAPITestCase(TestCase):
     def setUp(self):
