@@ -1,24 +1,36 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../components/Home.vue'
-import Groups from '../components/Groups.vue'
-import Artifacts from '../components/Artifacts.vue'
-import Halls from '../components/Halls.vue'
-import Curators from '../components/Curators.vue'
-import Exhibitions from '../components/Exhibitions.vue'
-
-const routes = [
-  { path: '/', component: Home },
-  { path: '/groups', component: Groups },
-  { path: '/artifacts', component: Artifacts },
-  { path: '/halls', component: Halls },
-  { path: '/curators', component: Curators },
-  { path: '/exhibitions', component: Exhibitions },
-]
+import Artifacts from '../components/Artifacts.vue';
+import Login from '../components/Login.vue';
+import Home from '../components/Home.vue';
+import { useUserInfoStore } from '@/stores/user_info_store';
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
+   history:createWebHistory(import.meta.env.BASE_URL),
+   routes:[
+    {
+      path:"/home",
+      component: Home
+    },
+    {
+      path:"/login",
+      name: "Login",
+      component: Login
+    },
+    {
+      path:"/artifacts",
+      component: Artifacts
+    }
+   ],
+  })
 
+
+  router.beforeEach((to,from)=>{
+    const userInfoStore=useUserInfoStore();
+    if(!userInfoStore.is_authenticated && to.name!='Login'){
+      return{name:'Login'}
+
+    }
+
+
+  })
 export default router

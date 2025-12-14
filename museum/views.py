@@ -1,11 +1,18 @@
-from django.shortcuts import render
-from django.http import HttpResponse
 from museum.models import Artifact
-from django.views.generic import TemplateView
-# Create your views here.
-class showArtifactsView(TemplateView):
-    template_name="artifacts/show_artifacts.html"
-    def get_context_data(self,**kwargs:any)->dict[str, any]:
-        context=super().get_context_data(**kwargs)
-        context['artifacts']=Artifact.objects.all()
-        return context
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from .serializers import ArtifactSerializer, UserSerializer, RegisterSerializer
+from rest_framework.views import APIView
+
+
+class RegisterView(APIView):
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
