@@ -1,273 +1,373 @@
 <script setup>
-import { ref, onBeforeMount } from 'vue'
+import { ref, computed , onBeforeMount, onMounted} from 'vue'
 import axios from 'axios'
-
-const halls = ref([])
-const name = ref('')
-const group_id = ref(null)
-const hallPictureRef = ref()
-const hallAddImageUrl = ref('')
-const isLoading = ref(false)
-const editingHallId = ref(null)
+import { useUserInfoStore } from '../stores/user_info_store';
+import { storeToRefs } from 'pinia'
 
 
-async function loadHalls() {
-  try {
-    const r = await axios.get('http://127.0.0.1:8000/api/halls/')
-    const data = Array.isArray(r.data.results) ? r.data.results : r.data
-    halls.value = data.filter(h => h && h.name)
-  } catch (error) {
-    console.error('Ошибка загрузки залов:', error)
+const groups = ref([]); 
+const halls = ref([]);
+const hallToAdd = ref({});
+const userInfoStore=useUserInfoStore();
+const hallToEdit = ref({});
+const hallPictureRef = ref();
+const hallAddImageUrl=ref()
+const imagePreviewUrl = ref(null);
+const imagePreviewTitle = ref('');
+const hallEditPictureRef = ref();
+const hallEditImageUrl = ref();
+const users = ref([])
+const selectedUser = ref(null)
+const stats = ref({}) 
+
+function hallEditPictureChange() {
+  if (hallEditPictureRef.value?.files?.[0]) {
+    hallEditImageUrl.value = URL.createObjectURL(hallEditPictureRef.value.files[0]);
+  } else {
+    hallEditImageUrl.value = null;
   }
 }
+const loading = ref(false)
+const{
+  username,
+  is_superuser
+}=storeToRefs(userInfoStore)
 
-
-async function saveHall() {
-  if (!name.value) { 
-    alert('Введите название'); 
-    return 
+const groupDict = computed(() => {
+  const dict = {}
+  for (const g of groups.value) {
+    dict[g.id] = g.name
   }
+  return dict
+})
 
-  isLoading.value = true
-  try {
-    const formData = new FormData()
-    formData.append('name', name.value)
-    if (group_id.value !== null && group_id.value !== '') {
-      formData.append('group_id', group_id.value)
-    }
+async function fetchHalls() {
+  loading.value = true;
 
-    if (hallPictureRef.value?.files[0]) {
-      formData.append('picture', hallPictureRef.value.files[0])
-    }
-
-    if (editingHallId.value) {
-      await axios.put(`http://127.0.0.1:8000/api/halls/${editingHallId.value}/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+  const params = {};
+  if (is_superuser.value) {
+    if (selectedUser.value) {
+      params.user = selectedUser.value;
     } else {
-      await axios.post('http://127.0.0.1:8000/api/halls/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      params.all_users = true; 
     }
-
-    resetForm()
-    await loadHalls()
-  } catch (error) {
-    console.error('Ошибка сохранения холла:', error)
-    if (error.response?.data) console.error('Response data:', error.response.data)
-    alert('Ошибка при сохранении (см. консоль)')
-  } finally {
-    isLoading.value = false
   }
+
+  const r = await axios.get('/api/halls/', { params });
+  halls.value = r.data;
+
+  loading.value = false;
 }
 
-// === удаление ===
-async function deleteHall(id) {
-  if (!confirm('Удалить этот зал?')) return
-  try {
-    await axios.delete(`http://127.0.0.1:8000/api/halls/${id}/`)
-    await loadHalls()
-  } catch (error) {
-    console.error('Ошибка удаления холла:', error)
-    alert('Ошибка при удалении холла')
+
+async function fetchGroups() {
+    const response = await axios.get("/api/groups/"); 
+    console.log('Эпохи:', response.data);
+    groups.value = response.data;
+
+}
+
+async function fetchUsers() {
+  if (!is_superuser.value) return
+
+  const r = await axios.get('/api/users/all')
+  users.value = r.data
+}
+
+async function fetchStats() {
+  const r = await axios.get('/api/artifacts/stats/')
+  stats.value = r.data
+}
+
+async function onLoadClick(params) {
+  await fetchHalls()
+}
+onBeforeMount(async()=>{
+  await fetchHalls()
+  await fetchGroups()
+  await fetchUsers()
+  await fetchStats()
+})
+
+async function onHallsAdd() {
+  const formData = new FormData();
+
+  formData.append('name', hallToAdd.value.name);
+  formData.append(
+    'group_id',
+    Number(hallToAdd.value.group_id)
+  );
+
+  if (hallsPictureRef.value?.files?.[0]) {
+    formData.append('picture', hallsPictureRef.value.files[0]);
   }
+
+  await axios.post('/api/halls/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+
+  await fetchHalls();
 }
 
-// === предпросмотр изображения ===
-function hallAddPictureChange() {
-  const file = hallPictureRef.value?.files[0]
-  if (!file) { hallAddImageUrl.value = ''; return }
-
-  if (!file.type.startsWith('image/')) { alert('Выберите изображение'); hallPictureRef.value.value = ''; return }
-  if (file.size > 5*1024*1024) { alert('Максимальный размер — 5MB'); hallPictureRef.value.value=''; return }
-
-  hallAddImageUrl.value = URL.createObjectURL(file)
+async function onRemoveClick(hall) {
+  await axios.delete(`/api/halls/${hall.id}/`);
+  await fetchHalls(); 
 }
 
-// === редактирование ===
-function editHall(h) {
-  editingHallId.value = h.id
-  name.value = h.name
-  group_id.value = h.group?.id || null
-  hallAddImageUrl.value = h.picture || ''
-  if (hallPictureRef.value) hallPictureRef.value.value = ''
+async function onHallEditClick(hall) {
+  hallToEdit.value = {
+    id: hall.id,
+    name: hall.name,
+    group_id: hall.group.id,
+    picture: hall.picture
+  };
+
+  hallEditImageUrl.value = null;
 }
 
-// === сброс формы ===
-function resetForm() {
-  editingHallId.value = null
-  name.value = ''
-  group_id.value = null
-  hallAddImageUrl.value = ''
-  if (hallPictureRef.value) hallPictureRef.value.value = ''
+async function onUpdateHall() {
+  const formData = new FormData();
+
+  formData.append('name', hallToEdit.value.name);
+  formData.append(
+    'group_id',
+    Number(hallToEdit.value.group_id)
+  );
+
+  if (hallEditPictureRef.value?.files?.[0]) {
+    formData.append('picture', hallEditPictureRef.value.files[0]);
+  }
+
+  await axios.put(
+    `/api/halls/${hallToEdit.value.id}/`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  );
+
+  await fetchHalls();
 }
 
-onBeforeMount(loadHalls)
+async function hallsAddPictureChange(params) {
+  hallAddImageUrl.value=URL.createObjectURL(hallsPictureRef.value.files[0])
+}
+
+function openImagePreview(hall) {
+  imagePreviewUrl.value = hall.picture;
+  imagePreviewTitle.value = hall.name;
+}
+
+
+
 </script>
 
 <template>
-  <div class="halls-page">
-    <h1>Залы</h1>
+  <div>
+    <h1>Выставки</h1>
+    {{ username }}
 
-    <form @submit.prevent="saveHall" class="hall-form">
-      <input v-model="name" placeholder="Название зала *" required>
-      <input v-model.number="group_id" placeholder="ID группы" type="number">
-      <input type="file" ref="hallPictureRef" accept="image/*" @change="hallAddPictureChange">
 
-      <button type="submit" :disabled="isLoading">{{ editingHallId ? 'Сохранить' : 'Добавить' }}</button>
-      <button type="button" @click="resetForm" :disabled="isLoading" class="secondary">Очистить</button>
+
+    <form @submit.prevent.stop="onArtifactAdd" class="p-3 border rounded shadow-sm">
+      <div class="d-flex flex-column gap-3">
+        <div class="d-flex gap-3 flex-wrap">
+          <div class="flex-grow-1">
+            <div class="form-floating">
+              <input
+                type="text"
+                class="form-control"
+                v-model="artifactToAdd.name"
+                required
+              />
+              <label>Название</label>
+            </div>
+          </div>
+
+          <div style="min-width: 150px;">
+            <div class="form-floating">
+              <select class="form-select" v-model="artifactToAdd.group_id" required>
+                <option :value="g.id" v-for="g in groups" :key="g.id">
+                  {{ g.name }}
+                </option>
+              </select>
+              <label>Эпоха</label>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <input
+            class="form-control"
+            type="file"
+            ref="artifactsPictureRef"
+            @change="artifactsAddPictureChange"
+          />
+        </div>
+
+        <div v-if="artifactAddImageUrl">
+          <img :src="artifactAddImageUrl" style="max-height:120px;" alt="Превью" class="img-thumbnail"/>
+        </div>
+
+        <div>
+          <button type="submit" class="btn btn-primary">
+            Добавить
+          </button>
+        </div>
+      </div>
     </form>
 
-    <div v-if="hallAddImageUrl" class="preview">
-      <img :src="hallAddImageUrl" alt="Предпросмотр">
-      <button @click="hallAddImageUrl = ''; hallPictureRef.value.value = ''">✕</button>
+    <div v-if="is_superuser" class="mt-3 mb-3">
+      <label class="form-label">Фильтр по пользователю</label>
+      <select class="form-select" v-model="selectedUser" @change="fetchArtifacts">
+        <option :value="null">Все пользователи</option>
+        <option v-for="u in users" :key="u.id" :value="u.id">
+          {{ u.username }}
+        </option>
+      </select>
     </div>
 
-    <div v-if="halls.length" class="halls-list">
-      <div v-for="h in halls" :key="h?.id" class="hall-card">
-        <div v-if="h?.picture">
-          <img :src="h.picture" :alt="h.name" class="hall-image">
+
+    <div class="mb-3">
+      <h3>Статистика:</h3>
+      <p>Всего артефактов: {{ stats.count }}</p>
+      <p>Среднее ID: {{ stats.avg }}</p>
+      <p>Минимальный ID: {{ stats.min }}</p>
+      <p>Максимальный ID: {{ stats.max }}</p>
+    </div>
+    <div class="container mt-4">
+      <h2 class="mb-4">Артефакты</h2>
+
+      <div v-if="loading" class="text-center my-5">
+        <div class="spinner-border"></div>
+      </div>
+
+      <div v-else-if="!artifacts.length" class="alert alert-secondary">
+        Артефакты не найдены
+      </div>
+
+      <div class="row g-4">
+        <div v-for="artifact in artifacts" :key="artifact.id" class="col-lg-4 col-md-6">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">{{ artifact.name }}</h5>
+              <p class="card-text text-muted">
+                <strong>Эпоха:</strong> {{ artifact.group.name }}
+              </p>
+
+              <div v-if="artifact.picture" class="mt-2">
+                <img
+                  :src="artifact.picture"
+                  class="img-thumbnail"
+                  style="max-height:60px; cursor:pointer;"
+                  @click="openImagePreview(artifact)"
+                  data-bs-toggle="modal"
+                  data-bs-target="#imagePreviewModal"
+                />
+              </div>
+
+              <button
+                class="btn btn-success btn-sm mt-2 me-2"
+                @click="onArtifactEditClick(artifact)"
+                data-bs-toggle="modal"
+                data-bs-target="#editArtifactModal"
+              >
+                Редактировать
+              </button>
+
+              <button
+                class="btn btn-danger btn-sm mt-2"
+                @click="onRemoveClick(artifact)"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
         </div>
-        <div v-else class="no-image">
-          📷 Нет изображения
-        </div>
-        <h3>{{ h.name }}</h3>
-        <small>ID группы: {{ h.group?.name || h.group || '—' }}</small>
-        <button @click="editHall(h)">Редактировать</button>
-        <button @click="deleteHall(h.id)" class="delete">Удалить</button>
       </div>
     </div>
 
-    <div v-else class="empty">
-      <p>📭 Залов пока нет</p>
-      <small>Добавьте первый зал</small>
+    <div class="modal fade" id="editArtifactModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Редактировать артефакт</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="row g-2">
+              <div class="col">
+                <div class="form-floating">
+                  <input
+                    type="text"
+                    class="form-control"
+                    v-model="artifactToEdit.name"
+                  />
+                  <label>Название</label>
+                </div>
+              </div>
+
+              <div class="col-auto">
+                <div class="form-floating">
+                  <select class="form-select" v-model="artifactToEdit.group_id">
+                    <option :value="g.id" v-for="g in groups" :key="g.id">
+                      {{ g.name }}
+                    </option>
+                  </select>
+                  <label>Эпоха</label>
+                </div>
+              </div>
+
+              <div class="col-12 mt-2">
+                <input
+                  class="form-control"
+                  type="file"
+                  ref="artifactEditPictureRef"
+                  @change="artifactEditPictureChange"
+                />
+              </div>
+
+              <div v-if="artifactEditImageUrl" class="mt-2">
+                <img :src="artifactEditImageUrl" style="max-height:120px;" class="img-thumbnail" alt="Превью"/>
+              </div>
+
+              <div v-else-if="artifactToEdit.picture" class="mt-2">
+                <img :src="artifactToEdit.picture" style="max-height:120px;" class="img-thumbnail" alt="Старая картинка"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Закрыть
+            </button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="onUpdateArtifact">
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ imagePreviewTitle }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body text-center">
+            <img :src="imagePreviewUrl" class="img-fluid rounded" alt="Просмотр изображения"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
-
-<style scoped>
-.halls-page {
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 1rem;
-  font-family: system-ui, sans-serif;
-  color: #333;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.hall-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
-}
-
-.hall-form input {
-  padding: 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
-
-button {
-  padding: 0.6rem 1rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background: #4f46e5;
-  color: white;
-  font-weight: 500;
-  transition: 0.2s;
-}
-
-button:hover {
-  background: #4338ca;
-}
-
-button.secondary {
-  background: #e5e7eb;
-  color: #333;
-}
-
-button.secondary:hover {
-  background: #d1d5db;
-}
-
-.preview {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.preview img {
-  max-width: 200px;
-  border-radius: 8px;
-  margin-right: 0.5rem;
-}
-
-.halls-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.hall-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 0.75rem;
-  text-align: center;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.hall-image {
-  width: 100%;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
-  object-fit: cover;
-  height: 150px;
-}
-
-.no-image {
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f0f0;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.hall-card h3 {
-  margin: 0.3rem 0;
-  font-size: 1rem;
-  flex-grow: 1;
-}
-
-.hall-card small {
-  display: block;
-  margin-bottom: 0.5rem;
-  color: #666;
-}
-
-button.delete {
-  background: #ef4444;
-  margin-top: auto;
-}
-
-button.delete:hover {
-  background: #dc2626;
-}
-
-.empty {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-}
-</style>

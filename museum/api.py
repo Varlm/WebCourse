@@ -10,10 +10,11 @@ from .models import Artifact, Hall, Curator, Exhibition, Group
 from .serializers import (
     ArtifactSerializer, HallSerializer, CuratorSerializer,
     ExhibitionSerializer, GroupSerializer, UserSerializer,
-    RegisterSerializer
+    RegisterSerializer,StatsSerializer
 )
 from rest_framework import serializers
 from rest_framework.viewsets import GenericViewSet
+from django.db.models import Avg, Count, Max,Min
 
 class UserObjectPermissionMixin:
     def get_queryset(self):
@@ -43,12 +44,24 @@ class ArtifactsViewset(UserObjectPermissionMixin, OwnerProtectionMixin,
                        mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = Artifact.objects.all()
     serializer_class = ArtifactSerializer
-    def get_queryset(self):
-        qs = super().get_queryset()
-        
-        # фильтруем по текущему юзеру
-        qs = qs.filter(user=self.request.user)
 
+    @action(detail=False, methods=["GET"], url_path="stats")
+    def get_stats(self, request, *args, **kwargs):
+        stats=Artifact.objects.aggregate(
+            count=Count("*"),
+            avg=Avg("id"),
+            max=Max("id"),
+            min=Min("id"),
+        )
+        serializer=serializer = StatsSerializer(stats)
+        return Response(serializer.data)
+
+    def get_queryset(self):
+        user = self.request.query_params.get('user')
+        all_users = self.request.query_params.get('all_users')
+        qs = Artifact.objects.all()
+        if not self.request.user.is_superuser or user:
+            qs = qs.filter(user__id=user) if user else qs.filter(user=self.request.user)
         return qs
 
 class HallsViewset(UserObjectPermissionMixin, OwnerProtectionMixin,
@@ -84,7 +97,9 @@ class UserProfileViewset(GenericViewSet):
        return Response({
            'username': self.request.user.username,
            'is_authenticated':self.request.user.is_authenticated,
-            'is_staff':self.request.user.is_staff
+            'is_staff':self.request.user.is_staff,
+             'is_superuser': self.request.user.is_superuser,
+             'can_create_artifacts':self.request.user.has_perm('museum.can_create_artifacts')
        })
    @action(url_path="login",methods=["POST"],detail=False)
    def process_login(self,*args,**kwargs):
@@ -114,4 +129,9 @@ class UserProfileViewset(GenericViewSet):
        return Response({
            "status": "success"
        })
+   
+   @action(detail=False, methods=["GET"],url_path="all")
+   def all_users(self, request):
+        users = User.objects.all().values("id", "username")
+        return Response(users)
    

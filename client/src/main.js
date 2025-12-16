@@ -5,6 +5,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import App from './components/App.vue'
 import router from './router'
 import Cookies from 'js-cookie';
+import "bootstrap/dist/js/bootstrap";
 axios.defaults.withCredentials = true
 axios.defaults.xsrfCookieName = 'csrftoken'
 axios.defaults.xsrfHeaderName = 'X-CSRFToken'

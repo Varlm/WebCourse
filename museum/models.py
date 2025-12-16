@@ -22,7 +22,7 @@ class TimestampModel(models.Model):
         abstract = True
 
 class Artifact(TimestampModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey("auth.User",verbose_name="пользователь", on_delete=models.CASCADE,null=True)
     name = models.TextField()
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
     picture = models.ImageField(null=True, upload_to="museum")
@@ -41,8 +41,8 @@ class Hall(TimestampModel):
     picture = models.ImageField(upload_to='halls/', null=True, blank=True)
 
     class Meta:
-        verbose_name = "Зал"
-        verbose_name_plural = "Залы"
+        verbose_name = "Выставка"
+        verbose_name_plural = "Выставки"
 
     def __str__(self):
         return self.name
@@ -86,6 +86,10 @@ class UserProfile(TimestampModel):
     def __str__(self):
         return f"{self.user.username} ({self.get_type_display()})"
 
+    class Meta:
+        permissions=[
+            ("can_create_artifacts","Может создавать экспонаты"),
+        ]
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

@@ -13,7 +13,7 @@ from museum.views import RegisterView
 
 router = DefaultRouter()
 router.register('users', UserProfileViewset, basename='users')
-router.register("museum", ArtifactsViewset, basename="museum")
+router.register('artifacts', ArtifactsViewset, basename='artifacts')
 router.register("halls", HallsViewset, basename="halls")
 router.register("curators", CuratorsViewset, basename="curators")
 router.register("groups", GroupsViewset, basename="groups")
@@ -23,7 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('', lambda request: HttpResponse("Django сервер работает!")),
-]
+]+static (settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
 if settings.DEBUG:

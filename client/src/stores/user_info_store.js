@@ -9,22 +9,25 @@ export const useUserInfoStore = defineStore("userInfoStore", ()=>{
   const userInfo = ref({});
   const username=ref();
   const is_authenticated=ref(false);
+  const is_superuser=ref(false);
   async function fetchUserInfo(params) {
       const r = await axios.get("/api/users/my/");
       userInfo.value=r.data;
       username.value=r.data.username;
       is_authenticated.value=r.data.is_authenticated;
       axios.defaults.headers.common['X-CSRFToken'] = Cookies.get("csrftoken");
+      is_superuser.value = r.data.is_superuser;
   }
 
-  onBeforeMount(async()=>{    
-    await fetchUserInfo();
+  onBeforeMount(() => {
+  console.log("STORE onBeforeMount");
   })
   
   return{
     fetchUserInfo,
     username,
     is_authenticated,
+    is_superuser,
   }
 
 });

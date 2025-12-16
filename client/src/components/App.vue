@@ -32,18 +32,37 @@ async function onLogout(params) {
 
 
 <template>
-Я VUE
-{{ userInfo }}
+  <div>
+    Я VUE
+    {{ userInfo }}
 
-  <nav class="d-flex" style="padding: 8px; justify-content: space-between;">
-    <div class="d-flex" style="gap: 8px">
-    <router-link to="/">Главная</router-link>
-    <router-link to="/artifacts" >Страница 1</router-link>
-    </div>
+    <nav class="d-flex align-items-center" style="padding: 8px; justify-content: space-between;">
+      <div class="d-flex" style="gap: 8px">
+        <router-link to="/">Главная</router-link>
+        <router-link to="/artifacts">Экспонаты</router-link>
+        <router-link to="/curators">Экскурсоводы</router-link>
+        <router-link to="/exhibitions">Экскурсии</router-link>
+        <router-link to="/halls">Выставки</router-link>
+      </div>
 
-    <button @click="onLogout" v-if="is_authenticated">Выйти</button>
-  </nav>
+      <div class="d-flex" style="gap: 8px; align-items: center;">
+        <router-link
+          to="/admin"
+          class="btn btn-outline-secondary btn-sm"
+        >
+          Вход в админку
+        </router-link>
 
-<router-view />
+        <button
+          @click="onLogout"
+          v-if="is_authenticated"
+          class="btn btn-danger btn-sm"
+        >
+          Выйти
+        </button>
+      </div>
+    </nav>
 
+    <router-view />
+  </div>
 </template>

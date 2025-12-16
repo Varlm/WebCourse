@@ -14,15 +14,16 @@ class ArtifactSerializer(serializers.ModelSerializer):
         queryset=Group.objects.all(),
         write_only=True
     )
-
+    def create(self, validated_data):
+        if 'request' in self.context:
+            validated_data['user'] = self.context['request'].user          
+        return super().create(validated_data)    
     class Meta:
         model = Artifact
         fields = ['id', 'name', 'group', 'group_id', 'picture', 'user']
         read_only_fields = ['user']
 
-    def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
+
 
 class HallSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
@@ -101,3 +102,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['id', 'user', 'name', 'stage', 'type', 'created_at', 'updated_at']
+
+
+class StatsSerializer(serializers.Serializer):
+    count = serializers.IntegerField(required=False)
+    avg = serializers.FloatField(required=False)
+    min = serializers.FloatField(required=False)
+    max = serializers.FloatField(required=False)
